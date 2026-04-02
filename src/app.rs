@@ -3,7 +3,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::nuget::client::{NugetClient, Package};
-use crate::types::{Panel, Project, Tab};
+use crate::types::{Panel, Project, SearchState, Tab};
 
 #[derive(Debug)]
 pub struct App {
@@ -12,6 +12,7 @@ pub struct App {
     pub client: NugetClient,
     pub active_panel: Panel,
     pub active_tab: Tab,
+    pub search_state: SearchState,
     pub packages: Vec<Package>,
     pub search_input: String,
     pub selected: Option<usize>,
@@ -42,6 +43,7 @@ impl Default for App {
             packages: Vec::new(),
             search_input: String::new(),
             selected: None,
+            search_state: SearchState::Inactive,
             projects: Vec::new(),
         }
     }
@@ -67,7 +69,15 @@ impl App {
         match event {
             AppEvent::SearchResult(result) => {
                 self.packages = result;
-                self.selected = if !self.packages.is_empty() { Some(0) } else { None };
+                self.selected = if !self.packages.is_empty() {
+                    Some(0)
+                } else {
+                    None
+                };
+            }
+            AppEvent::Error(err) => {
+                self.packages = Vec::new();
+                self.selected = None;
             }
             _ => {}
         }

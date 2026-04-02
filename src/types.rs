@@ -9,6 +9,13 @@ pub enum Panel {
     Packages,
 }
 
+#[derive(Debug, Default, PartialEq)]
+pub enum SearchState {
+    Active,
+    #[default]
+    Inactive,
+}
+
 #[derive(Debug, Default)]
 pub enum Tab {
     #[default]

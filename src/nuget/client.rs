@@ -1,4 +1,4 @@
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct NugetClient {
     client: reqwest::Client,
 }
@@ -11,56 +11,45 @@ impl NugetClient {
     }
 
     pub async fn search(&self, query: &str) -> Result<Vec<Package>, anyhow::Error> {
-        let url = format!("https://api.nuget.org/v3/search?q={}", query);
+        let url = format!("https://azuresearch-usnc.nuget.org/query?q={}", query);
         let response = self.client.get(&url).send().await?;
         let body = response.text().await?;
-        let packages: Vec<Package> = serde_json::from_str(&body)?;
-        Ok(packages)
+        let search_response: SearchResponse = serde_json::from_str(&body)?;
+        Ok(search_response.data)
     }
+}
 
-    pub async fn search_by_ids(&self, ids: Vec<String>) -> Result<Vec<Package>, anyhow::Error> {
-        let url = format!(
-            "https://api.nuget.org/v3/registration5-semver1/{}/index.json",
-            ids.join("/")
-        );
-        let response = self.client.get(&url).send().await?;
-        let body = response.text().await?;
-        let packages: Vec<Package> = serde_json::from_str(&body)?;
-        Ok(packages)
-    }
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResponse {
+    pub total_hits: u64,
+    pub data: Vec<Package>,
 }
 
 #[derive(Debug, Default, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Package {
+    #[serde(rename = "@id")]
+    pub url: String,
+    #[serde(rename = "@type")]
+    pub kind: String,
+    pub registration: String,
     pub id: String,
     pub version: String,
-    pub versions: Vec<PackageVersion>,
-    pub package_types: Vec<PackageType>,
-    #[serde(default)]
-    pub description: Option<String>,
-    #[serde(default, deserialize_with = "string_or_vec")]
-    pub authors: Vec<String>,
-    #[serde(default)]
-    pub icon_url: Option<String>,
-    #[serde(default)]
-    pub license_url: Option<String>,
-    #[serde(default, deserialize_with = "string_or_vec")]
-    pub owners: Vec<String>,
-    #[serde(default)]
-    pub project_url: Option<String>,
-    #[serde(default)]
-    pub registration: Option<String>,
-    #[serde(default)]
-    pub summary: Option<String>,
-    #[serde(default, deserialize_with = "string_or_vec")]
+    pub description: String,
+    pub summary: String,
+    pub title: String,
+    pub icon_url: String,
+    pub license_url: String,
+    pub project_url: String,
     pub tags: Vec<String>,
-    #[serde(default)]
-    pub title: Option<String>,
-    #[serde(default)]
-    pub total_downloads: Option<u64>,
-    #[serde(default)]
-    pub verified: Option<bool>,
+    pub authors: Vec<String>,
+    pub owners: Vec<String>,
+    pub total_downloads: u64,
+    pub verified: bool,
+    pub package_types: Vec<PackageType>,
+    pub versions: Vec<PackageVersion>,
+    pub vulnerabilities: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -74,23 +63,4 @@ pub struct PackageVersion {
 #[derive(Debug, Default, serde::Deserialize)]
 pub struct PackageType {
     pub name: String,
-}
-
-fn string_or_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::Deserialize;
-
-    #[derive(serde::Deserialize)]
-    #[serde(untagged)]
-    enum StringOrVec {
-        String(String),
-        Vec(Vec<String>),
-    }
-
-    match StringOrVec::deserialize(deserializer)? {
-        StringOrVec::String(s) => Ok(vec![s]),
-        StringOrVec::Vec(v) => Ok(v),
-    }
 }
