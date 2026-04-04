@@ -33,7 +33,7 @@ pub enum PanelChangeDirection {
 pub struct Project {
     pub project_name: String,
     pub project_path: PathBuf,
-    pub unloaded_packages: Vec<PackageRef>,
+    pub package_refs: Vec<PackageRef>,
 }
 
 #[derive(Debug, Default)]

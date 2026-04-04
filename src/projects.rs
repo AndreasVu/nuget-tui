@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 
-use tokio::fs;
+use futures::future;
 use walkdir::WalkDir;
 
 use crate::{
+    app::App,
     nuget::client::Package,
     types::{PackageRef, Project},
 };
@@ -11,6 +12,33 @@ use crate::{
 pub enum ProjectFile {
     Solution(PathBuf),
     Project(PathBuf),
+}
+
+impl App {
+    pub async fn get_packages_from_projects(&self) -> Vec<Package> {
+        let tasks = self.projects.iter().map(|p| async move {
+            return self
+                .client
+                .get_packages(
+                    p.package_refs
+                        .iter()
+                        .map(|r| r.package_id.clone())
+                        .collect(),
+                )
+                .await;
+        });
+
+        let package_results = future::join_all(tasks).await;
+
+        package_results
+            .into_iter()
+            .filter_map(|p| match p {
+                Ok(packages) => Some(packages),
+                _ => None,
+            })
+            .flatten()
+            .collect()
+    }
 }
 
 pub fn get_project_packages() -> Vec<Project> {
@@ -30,6 +58,8 @@ pub fn get_project_packages() -> Vec<Project> {
                 let Ok(project) = parse_packages(&path) else {
                     return None;
                 };
+
+                println!("{}", project.project_name);
 
                 Some(project)
             }
@@ -64,7 +94,7 @@ fn parse_packages(path: &PathBuf) -> anyhow::Result<Project> {
             .unwrap_or("")
             .to_string(),
         project_path: path.clone(),
-        unloaded_packages: packages,
+        package_refs: packages,
     })
 }
 

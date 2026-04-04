@@ -38,11 +38,12 @@ impl App {
         let package_list_area = packages_area_layout[1];
 
         // Project panel
-        let mut proj_widget = Paragraph::new("csproj selection here").block(
-            Block::new()
-                .borders(Borders::ALL)
-                .title_top("Selected project"),
-        );
+        let mut proj_widget = List::new(self.projects.iter().map(|p| p.project_name.clone()))
+            .block(
+                Block::new()
+                    .borders(Borders::ALL)
+                    .title_top("Selected project"),
+            );
         if self.active_panel == Panel::Project {
             proj_widget = proj_widget.rapid_blink();
         }

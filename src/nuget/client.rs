@@ -1,3 +1,5 @@
+use futures::future;
+
 #[derive(Debug, Default, Clone)]
 pub struct NugetClient {
     client: reqwest::Client,
@@ -15,7 +17,7 @@ impl NugetClient {
         query: &str,
         take: usize,
         skip: usize,
-    ) -> Result<Vec<Package>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<Package>> {
         let url = format!(
             "https://azuresearch-usnc.nuget.org/query?q={}&take={}&skip={}",
             query, take, skip
@@ -24,6 +26,23 @@ impl NugetClient {
         let body = response.text().await?;
         let search_response: SearchResponse = serde_json::from_str(&body)?;
         Ok(search_response.data)
+    }
+
+    pub async fn get_packages(&self, packages: Vec<String>) -> anyhow::Result<Vec<Package>> {
+        let queries = packages
+            .into_iter()
+            .map(|p| async move { return self.search(&p, 1, 0).await });
+
+        let results = future::join_all(queries).await;
+
+        return Ok(results
+            .into_iter()
+            .filter_map(|r| match r {
+                Ok(r) => Some(r),
+                Err(_) => None,
+            })
+            .flatten()
+            .collect());
     }
 }
 

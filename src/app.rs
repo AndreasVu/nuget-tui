@@ -54,7 +54,7 @@ impl App {
     pub async fn run(&mut self, terminal: &mut ratatui::DefaultTerminal) -> anyhow::Result<()> {
         let mut events = EventStream::new();
 
-        self.initialize_application();
+        self.initialize_application().await;
 
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
@@ -68,9 +68,9 @@ impl App {
         Ok(())
     }
 
-    fn initialize_application(&mut self) {
+    async fn initialize_application(&mut self) {
         self.projects = get_project_packages();
-        self.packages = get_packages_from_projects();
+        self.packages = self.get_packages_from_projects().await;
         // Fetch packages in current project.
         // fetch all packages installed
     }
