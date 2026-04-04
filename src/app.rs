@@ -3,6 +3,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::nuget::client::{NugetClient, Package};
+use crate::projects::get_project_packages;
 use crate::types::{Panel, Project, SearchState, Tab};
 
 #[derive(Debug)]
@@ -53,6 +54,8 @@ impl App {
     pub async fn run(&mut self, terminal: &mut ratatui::DefaultTerminal) -> anyhow::Result<()> {
         let mut events = EventStream::new();
 
+        self.initialize_application();
+
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
 
@@ -63,6 +66,13 @@ impl App {
         }
 
         Ok(())
+    }
+
+    fn initialize_application(&mut self) {
+        self.projects = get_project_packages();
+        self.packages = get_packages_from_projects();
+        // Fetch packages in current project.
+        // fetch all packages installed
     }
 
     pub fn handle_app_event(&mut self, event: AppEvent) -> anyhow::Result<()> {

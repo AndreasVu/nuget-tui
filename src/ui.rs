@@ -1,11 +1,11 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout},
-    style::{Style, Stylize},
-    widgets::{Block, Borders, List, Paragraph},
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style, Stylize},
+    widgets::{Block, Borders, List, Paragraph, Tabs},
 };
 
-use crate::types::Panel;
+use crate::types::{Panel, Tab};
 
 use crate::app::App;
 
@@ -51,27 +51,21 @@ impl App {
         // Search panel
         let mut search_block = Block::new()
             .borders(Borders::ALL)
-            .title_top(self.search_input.clone());
+            .title_top("Search packages");
         if self.active_panel == Panel::Search {
             search_block = search_block.border_style(Style::new().cyan());
         }
 
-        let mut search_list = List::new(
-            self.packages
-                .iter()
-                .map(|p| p.title.clone())
-                .collect::<Vec<_>>(),
-        )
-        .block(search_block);
+        let mut search_field = Paragraph::new(self.search_input.clone()).block(search_block);
 
         if self.active_panel == Panel::Search {
-            search_list = search_list.rapid_blink();
+            search_field = search_field.rapid_blink();
         }
-        frame.render_widget(search_list, package_search_area);
+        frame.render_widget(search_field, package_search_area);
 
         // Package list panel
         frame.render_widget(
-            Paragraph::new("List of packages shown here").block(Block::new().borders(Borders::ALL)),
+            List::new(self.get_package_names()).block(Block::new().borders(Borders::ALL)),
             package_list_area,
         );
         frame.render_widget(
@@ -88,5 +82,28 @@ impl App {
                 .title_top("h/l - Navigate panel"),
             hints_area,
         );
+    }
+
+    pub fn render_package_tabs(&mut self, frame: &mut Frame, area: Rect) {
+        let tabs = Tabs::new(vec!["Installed", "Search", "Upgrades"])
+            .style(Color::DarkGray)
+            .select(self.active_tab as usize);
+
+        frame.render_widget(tabs, area);
+    }
+
+    pub fn render_package_content(&mut self, frame: &mut Frame, area: Rect) {
+        match self.active_tab {
+            Tab::Installed => {
+                // TODO: Render installed packages
+            }
+            Tab::Upgrades => {
+                // TODO: Find packages that has updates available
+            }
+            Tab::Search => {
+                // TODO: Render the search results
+                // Do default query if no search term is provided
+            }
+        }
     }
 }

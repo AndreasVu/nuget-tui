@@ -1,6 +1,8 @@
 mod app;
 mod events;
 mod nuget;
+mod projects;
+mod transformations;
 mod types;
 mod ui;
 

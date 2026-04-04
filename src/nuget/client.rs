@@ -10,8 +10,16 @@ impl NugetClient {
         }
     }
 
-    pub async fn search(&self, query: &str) -> Result<Vec<Package>, anyhow::Error> {
-        let url = format!("https://azuresearch-usnc.nuget.org/query?q={}", query);
+    pub async fn search(
+        &self,
+        query: &str,
+        take: usize,
+        skip: usize,
+    ) -> Result<Vec<Package>, anyhow::Error> {
+        let url = format!(
+            "https://azuresearch-usnc.nuget.org/query?q={}&take={}&skip={}",
+            query, take, skip
+        );
         let response = self.client.get(&url).send().await?;
         let body = response.text().await?;
         let search_response: SearchResponse = serde_json::from_str(&body)?;

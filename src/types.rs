@@ -16,12 +16,12 @@ pub enum SearchState {
     Inactive,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 pub enum Tab {
     #[default]
-    Installed,
-    Upgrades,
-    Search,
+    Installed = 0,
+    Upgrades = 1,
+    Search = 2,
 }
 
 pub enum PanelChangeDirection {
@@ -33,11 +33,11 @@ pub enum PanelChangeDirection {
 pub struct Project {
     pub project_name: String,
     pub project_path: PathBuf,
-    pub loaded_packages: Vec<UnLoadedPackage>,
+    pub unloaded_packages: Vec<PackageRef>,
 }
 
 #[derive(Debug, Default)]
-pub struct UnLoadedPackage {
+pub struct PackageRef {
     pub package_id: String,
     pub version: String,
 }

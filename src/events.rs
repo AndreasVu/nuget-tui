@@ -1,39 +1,33 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
+use tokio::sync::mpsc::Sender;
 
 use crate::app::{App, AppEvent};
+use crate::nuget::client::NugetClient;
 use crate::types::{PANEL_ORDER, Panel, PanelChangeDirection, SearchState};
 
 impl App {
     pub fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
         if let Event::Key(ke) = event {
             if ke.kind == KeyEventKind::Press {
-                self.handle_key_press(ke);
+                match self.active_panel {
+                    Panel::Search => self.handle_search_keys(ke),
+                    _ => self.handle_navigation_keys(ke),
+                }
             }
         }
         Ok(())
     }
 
-    pub fn handle_key_press(&mut self, key_event: KeyEvent) {
-        if self.active_panel == Panel::Search {
-            self.handle_search_input(key_event);
-            return;
-        }
-
+    fn handle_navigation_keys(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit = true,
-            KeyCode::Right => self.increment_counter(),
-            KeyCode::Left => self.decrement_counter(),
             KeyCode::Char('h') => self.handle_panel_change(PanelChangeDirection::Up),
             KeyCode::Char('l') => self.handle_panel_change(PanelChangeDirection::Down),
             _ => (),
         }
     }
 
-    fn handle_search_input(&mut self, key_event: KeyEvent) {
-        if self.active_panel != Panel::Search {
-            return;
-        }
-
+    fn handle_search_keys(&mut self, key_event: KeyEvent) {
         if self.search_state == SearchState::Inactive {
             match key_event.code {
                 KeyCode::Char('/') => {
@@ -41,10 +35,7 @@ impl App {
                         self.search_state = SearchState::Active;
                     }
                 }
-                KeyCode::Char('q') => self.exit = true,
-                KeyCode::Char('h') => self.handle_panel_change(PanelChangeDirection::Up),
-                KeyCode::Char('l') => self.handle_panel_change(PanelChangeDirection::Down),
-                _ => (),
+                _ => self.handle_navigation_keys(key_event),
             }
 
             return;
@@ -66,29 +57,7 @@ impl App {
                 let search_value = self.search_input.clone();
                 let client = self.client.clone();
 
-                tokio::spawn(async move {
-                    let packages = client.search(&search_value).await;
-                    match packages {
-                        Ok(packages) => {
-                            let message = AppEvent::SearchResult(packages);
-                            match tx.send(message).await {
-                                Ok(()) => {}
-                                Err(e) => {
-                                    eprintln!("Failed to send search result: {}", e);
-                                }
-                            }
-                        }
-                        Err(error) => {
-                            let message = AppEvent::Error(error);
-                            match tx.send(message).await {
-                                Ok(()) => {}
-                                Err(e) => {
-                                    eprintln!("Failed to send error: {}", e);
-                                }
-                            }
-                        }
-                    }
-                });
+                tokio::spawn(async move { search_packages(&client, &tx, search_value).await });
 
                 self.search_input.clear();
                 self.search_state = SearchState::Inactive;
@@ -124,12 +93,28 @@ impl App {
             .position(|p| p == &self.active_panel)
             .unwrap_or(0)
     }
+}
 
-    pub fn decrement_counter(&mut self) {
-        self.counter -= 1;
-    }
-
-    pub fn increment_counter(&mut self) {
-        self.counter += 1;
+async fn search_packages(client: &NugetClient, tx: &Sender<AppEvent>, search_value: String) {
+    let packages = client.search(&search_value, 50, 0).await;
+    match packages {
+        Ok(packages) => {
+            let message = AppEvent::SearchResult(packages);
+            match tx.send(message).await {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!("Failed to send search result: {}", e);
+                }
+            }
+        }
+        Err(error) => {
+            let message = AppEvent::Error(error);
+            match tx.send(message).await {
+                Ok(()) => {}
+                Err(e) => {
+                    eprintln!("Failed to send error: {}", e);
+                }
+            }
+        }
     }
 }
