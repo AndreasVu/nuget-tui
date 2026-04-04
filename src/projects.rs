@@ -7,13 +7,12 @@ use walkdir::WalkDir;
 
 use crate::{
     app::{App, AppEvent},
-    nuget::client::Package,
     types::{PackageRef, Project},
 };
 
 pub enum ProjectFile {
-    Solution(PathBuf),
     Project(PathBuf),
+    Solution(PathBuf),
 }
 
 impl App {
@@ -45,7 +44,9 @@ impl App {
                 .collect();
 
             match tx.send(AppEvent::SearchResult(all_packages)).await {
-                Ok(_) => {}
+                Ok(_) => {
+                    info!("Sent search result");
+                }
                 Err(e) => {
                     error!("Failed to send search result: {}", e);
                 }
@@ -69,7 +70,6 @@ pub fn get_project_packages() -> Vec<Project> {
         .filter(|f| matches!(f, ProjectFile::Project(_)))
         .collect();
 
-    // TODO: Handle .snl project. Currently we just ignore it.
     // TODO: Display errors if parsing of any project fails.
     let unloaded_nuget_packages: Vec<Project> = projects
         .into_iter()

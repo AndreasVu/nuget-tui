@@ -1,11 +1,13 @@
+use std::ops::Index;
+
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect, Rows},
     style::{Color, Style, Stylize},
-    widgets::{Block, Borders, List, Paragraph, Tabs},
+    widgets::{Block, Borders, List, Paragraph, Row, Table, Tabs},
 };
 
-use crate::types::{Panel, Tab};
+use crate::types::{PackageRef, Panel, Tab};
 
 use crate::app::App;
 
@@ -97,6 +99,50 @@ impl App {
         match self.active_tab {
             Tab::Installed => {
                 // TODO: Render installed packages
+                let rows = self
+                    .packages
+                    .iter()
+                    .map(|p| {
+                        if let Some(index) = self.selected_package_index {
+                            if let Some(current_project ) = self.projects.get(index) && let Some(package_ref) = current_project.package_refs.iter().find(|cp| cp.package_id == p.id) {
+                                TableRow {
+                                    name: p.id.clone(),
+                                    latest_version: p
+                                        .versions
+                                        .iter()
+                                        .max()
+                                        .cloned()
+                                        .unwrap_or("".to_string()),
+                                    installed_version: Some(package_ref.package_id),
+                                }
+                            } else {
+                                TableRow {
+                                    name: p.id.clone(),
+                                    latest_version: p
+                                        .versions
+                                        .iter()
+                                        .max()
+                                        .cloned()
+                                        .unwrap_or("".to_string()),
+                                    installed_version: None,
+                                }
+                            }
+                        } else {
+                            TableRow {
+                                name: p.id.clone(),
+                                latest_version: installed_package
+                                    .versions
+                                    .iter()
+                                    .max()
+                                    .cloned()
+                                    .unwrap_or("".to_string()),
+                                installed_version: None,
+                            }
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                    App::render_package_table(frame, area, rows);
             }
             Tab::Upgrades => {
                 // TODO: Find packages that has updates available
@@ -107,4 +153,41 @@ impl App {
             }
         }
     }
+
+    fn render_package_table(frame: &mut Frame, area: Rect, rows: Vec<TableRow>) {
+        let headers = Row::new(["Name", "Latest Version", "Installed Version"])
+            .style(Style::new().bold())
+            .bottom_margin(5);
+
+        let widths = [
+            Constraint::Min(20),
+            Constraint::Min(20),
+            Constraint::Min(20),
+            Constraint::Min(20),
+        ];
+
+        let rows = rows
+            .into_iter()
+            .map(|row| {
+                Row::new(vec![
+                    row.name,
+                    row.installed_version.unwrap_or("".to_string()),
+                    row.latest_version,
+                ])
+            })
+            .collect::<Vec<_>>();
+
+        let table = Table::new(rows, widths)
+            .header(headers)
+            .row_highlight_style(Style::new().on_magenta().green())
+            .highlight_symbol(">>");
+
+        frame.render_widget(table, area);
+    }
+}
+
+struct TableRow {
+    name: String,
+    latest_version: String,
+    installed_version: Option<String>,
 }

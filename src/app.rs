@@ -18,6 +18,7 @@ pub struct App {
     pub packages: Vec<Package>,
     pub search_input: String,
     pub selected: Option<usize>,
+    pub selected_package_index: Option<usize>,
     pub projects: Vec<Project>,
     pub tx: Sender<AppEvent>,
     pub rx: Receiver<AppEvent>,
@@ -47,6 +48,7 @@ impl Default for App {
             selected: None,
             search_state: SearchState::Inactive,
             projects: Vec::new(),
+            selected_package_index: None,
         }
     }
 }
