@@ -67,14 +67,23 @@ impl App {
         frame.render_widget(search_field, package_search_area);
 
         // Package list panel
-        frame.render_widget(
-            List::new(self.get_package_names()).block(Block::new().borders(Borders::ALL)),
-            package_list_area,
-        );
+        let package_list_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(10), Constraint::Percentage(90)])
+            .split(package_list_area);
+
+        let package_list_block = Block::new().borders(Borders::ALL).title_top("packages");
+        frame.render_widget(package_list_block, package_list_area);
+        self.render_package_tabs(frame, package_list_layout[0]);
+        self.render_package_content(frame, package_list_layout[1]);
+
+        // Package details panel
         frame.render_widget(
             Paragraph::new("package description here").block(Block::new().borders(Borders::ALL)),
             package_details_area,
         );
+
+        // Hints panel
         frame.render_widget(
             Block::default()
                 .borders(Borders::ALL)
@@ -87,7 +96,7 @@ impl App {
         );
     }
 
-    pub fn render_package_tabs(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn render_package_tabs(&self, frame: &mut Frame, area: Rect) {
         let tabs = Tabs::new(vec!["Installed", "Search", "Upgrades"])
             .style(Color::DarkGray)
             .select(self.active_tab as usize);
@@ -95,7 +104,7 @@ impl App {
         frame.render_widget(tabs, area);
     }
 
-    pub fn render_package_content(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn render_package_content(&self, frame: &mut Frame, area: Rect) {
         match self.active_tab {
             Tab::Installed => {
                 // TODO: Render installed packages
@@ -104,45 +113,39 @@ impl App {
                     .iter()
                     .map(|p| {
                         if let Some(index) = self.selected_package_index {
-                            if let Some(current_project ) = self.projects.get(index) && let Some(package_ref) = current_project.package_refs.iter().find(|cp| cp.package_id == p.id) {
-                                TableRow {
-                                    name: p.id.clone(),
-                                    latest_version: p
-                                        .versions
-                                        .iter()
-                                        .max()
-                                        .cloned()
-                                        .unwrap_or("".to_string()),
-                                    installed_version: Some(package_ref.package_id),
-                                }
-                            } else {
-                                TableRow {
-                                    name: p.id.clone(),
-                                    latest_version: p
-                                        .versions
-                                        .iter()
-                                        .max()
-                                        .cloned()
-                                        .unwrap_or("".to_string()),
-                                    installed_version: None,
-                                }
-                            }
-                        } else {
-                            TableRow {
-                                name: p.id.clone(),
-                                latest_version: installed_package
-                                    .versions
+                            if let Some(current_project) = self.projects.get(index)
+                                && let Some(package_ref) = current_project
+                                    .package_refs
                                     .iter()
-                                    .max()
-                                    .cloned()
-                                    .unwrap_or("".to_string()),
-                                installed_version: None,
+                                    .find(|cp| cp.package_id == p.id)
+                            {
+                                return TableRow {
+                                    name: p.id.clone(),
+                                    latest_version: p
+                                        .versions
+                                        .iter()
+                                        .last()
+                                        .map(|f| f.id.clone())
+                                        .unwrap_or("".to_string()),
+                                    installed_version: Some(package_ref.version.clone()),
+                                };
                             }
                         }
+
+                        return TableRow {
+                            name: p.id.clone(),
+                            latest_version: p
+                                .versions
+                                .iter()
+                                .last()
+                                .map(|f| f.id.clone())
+                                .unwrap_or("".to_string()),
+                            installed_version: None,
+                        };
                     })
                     .collect::<Vec<_>>();
 
-                    App::render_package_table(frame, area, rows);
+                App::render_package_table(frame, area, rows);
             }
             Tab::Upgrades => {
                 // TODO: Find packages that has updates available

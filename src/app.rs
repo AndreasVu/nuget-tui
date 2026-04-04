@@ -74,9 +74,10 @@ impl App {
 
     async fn initialize_application(&mut self) {
         self.projects = get_project_packages();
+        if self.projects.len() > 0 {
+            self.selected_package_index = Some(0);
+        }
         self.get_packages_from_projects();
-        // Fetch packages in current project.
-        // fetch all packages installed
     }
 
     pub fn handle_app_event(&mut self, event: AppEvent) -> anyhow::Result<()> {
