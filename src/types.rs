@@ -10,18 +10,19 @@ pub enum Panel {
 }
 
 #[derive(Debug, Default, PartialEq)]
-pub enum SearchState {
-    Active,
+pub enum SearchInputMode {
+    Editing,
     #[default]
-    Inactive,
+    Normal,
+    Searching,
 }
 
 #[derive(Debug, Default, Copy, Clone)]
 pub enum Tab {
     #[default]
     Installed = 0,
-    Upgrades = 1,
-    Search = 2,
+    Search = 1,
+    Upgrades = 2,
 }
 
 pub enum PanelChangeDirection {

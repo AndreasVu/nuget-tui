@@ -1,16 +1,18 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use tokio::sync::mpsc::Sender;
+use tracing::error;
+use tui_input::backend::crossterm::EventHandler;
 
 use crate::app::{App, AppEvent};
 use crate::nuget::client::NugetClient;
-use crate::types::{PANEL_ORDER, Panel, PanelChangeDirection, SearchState};
+use crate::types::{PANEL_ORDER, Panel, PanelChangeDirection, SearchInputMode, Tab};
 
 impl App {
     pub fn handle_event(&mut self, event: Event) -> anyhow::Result<()> {
         if let Event::Key(ke) = event {
             if ke.kind == KeyEventKind::Press {
                 match self.active_panel {
-                    Panel::Search => self.handle_search_keys(ke),
+                    Panel::Search => self.handle_search_keys(event),
                     _ => self.handle_navigation_keys(ke),
                 }
             }
@@ -27,12 +29,17 @@ impl App {
         }
     }
 
-    fn handle_search_keys(&mut self, key_event: KeyEvent) {
-        if self.search_state == SearchState::Inactive {
+    fn handle_search_keys(&mut self, event: Event) {
+        if !event.is_key_press() {
+            return;
+        }
+
+        let key_event = event.as_key_press_event().unwrap();
+        if self.search_state == SearchInputMode::Normal {
             match key_event.code {
                 KeyCode::Char('/') => {
-                    if self.search_state == SearchState::Inactive {
-                        self.search_state = SearchState::Active;
+                    if self.search_state == SearchInputMode::Normal {
+                        self.search_state = SearchInputMode::Editing;
                     }
                 }
                 _ => self.handle_navigation_keys(key_event),
@@ -43,24 +50,19 @@ impl App {
 
         match key_event.code {
             KeyCode::Esc => {
-                self.search_state = SearchState::Inactive;
-                self.search_input.clear();
+                self.search_state = SearchInputMode::Normal;
             }
-            KeyCode::Char(c) => {
-                self.search_input.push(c);
-            }
-            KeyCode::Backspace => {
-                self.search_input.pop();
+            KeyCode::Char(_) => {
+                self.search_input.handle_event(&event);
             }
             KeyCode::Enter => {
                 let tx = self.tx.clone();
-                let search_value = self.search_input.clone();
+                let search_value = self.search_input.value().to_string();
                 let client = self.client.clone();
 
                 tokio::spawn(async move { search_packages(&client, &tx, search_value).await });
 
-                self.search_input.clear();
-                self.search_state = SearchState::Inactive;
+                self.search_state = SearchInputMode::Searching;
             }
             _ => (),
         }
@@ -108,6 +110,7 @@ async fn search_packages(client: &NugetClient, tx: &Sender<AppEvent>, search_val
             }
         }
         Err(error) => {
+            error!("Failed to fetch packages from NuGet: {}", error);
             let message = AppEvent::Error(error);
             match tx.send(message).await {
                 Ok(()) => {}

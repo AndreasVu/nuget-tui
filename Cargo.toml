@@ -31,3 +31,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Config & paths
 config = "0.15"
 directories = "6"
+throbber-widgets-tui = "0.11.0"

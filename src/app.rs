@@ -1,11 +1,13 @@
 use crossterm::event::EventStream;
 use futures::StreamExt;
+use throbber_widgets_tui::ThrobberState;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::info;
+use tui_input::Input;
 
 use crate::nuget::client::{NugetClient, Package};
 use crate::projects::get_project_packages;
-use crate::types::{Panel, Project, SearchState, Tab};
+use crate::types::{Panel, Project, SearchInputMode, Tab};
 
 #[derive(Debug)]
 pub struct App {
@@ -14,9 +16,10 @@ pub struct App {
     pub client: NugetClient,
     pub active_panel: Panel,
     pub active_tab: Tab,
-    pub search_state: SearchState,
     pub packages: Vec<Package>,
-    pub search_input: String,
+    pub search_input: Input,
+    pub search_throbber_state: ThrobberState,
+    pub search_state: SearchInputMode,
     pub selected: Option<usize>,
     pub selected_package_index: Option<usize>,
     pub projects: Vec<Project>,
@@ -44,11 +47,12 @@ impl Default for App {
             counter: 0,
             exit: false,
             packages: Vec::new(),
-            search_input: String::new(),
+            search_input: Input::default(),
             selected: None,
-            search_state: SearchState::Inactive,
+            search_state: SearchInputMode::Normal,
             projects: Vec::new(),
             selected_package_index: None,
+            search_throbber_state: ThrobberState::default(),
         }
     }
 }
@@ -61,6 +65,7 @@ impl App {
         self.initialize_application().await;
 
         while !self.exit {
+            self.search_throbber_state.calc_next();
             terminal.draw(|frame| self.draw(frame))?;
 
             tokio::select! {
@@ -84,6 +89,11 @@ impl App {
         match event {
             AppEvent::SearchResult(result) => {
                 self.packages = result;
+                self.search_state = SearchInputMode::Normal;
+                if !self.search_input.value().is_empty() {
+                    self.active_tab = Tab::Search;
+                }
+
                 self.selected = if !self.packages.is_empty() {
                     Some(0)
                 } else {
