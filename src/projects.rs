@@ -1,6 +1,8 @@
+use std::env;
 use std::path::PathBuf;
 
 use futures::future;
+use tracing::info;
 use walkdir::WalkDir;
 
 use crate::{
@@ -42,7 +44,12 @@ impl App {
 }
 
 pub fn get_project_packages() -> Vec<Project> {
-    let project_files = find_project_files(".");
+    let binding = env::current_dir().unwrap();
+    let cwd = binding.to_str().unwrap_or(".");
+
+    let project_files = find_project_files(&cwd);
+
+    info!("Found {} project files", project_files.len());
 
     let projects: Vec<ProjectFile> = project_files
         .into_iter()
@@ -58,8 +65,6 @@ pub fn get_project_packages() -> Vec<Project> {
                 let Ok(project) = parse_packages(&path) else {
                     return None;
                 };
-
-                println!("{}", project.project_name);
 
                 Some(project)
             }
@@ -106,7 +111,7 @@ fn find_project_files(root: &str) -> Vec<ProjectFile> {
             e.path()
                 .extension()
                 .and_then(|ext| ext.to_str())
-                .map(|ext| ext == "sln" && ext == "csproj")
+                .map(|ext| ext == "sln" || ext == "csproj")
                 .unwrap_or(false)
         })
         .map(|e| {

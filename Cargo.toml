@@ -10,6 +10,7 @@ futures = "0.3"
 tui-input = { version = "*", features = ["crossterm"], default-features = false }
 walkdir = "2"
 roxmltree = "0.21.1"
+tracing-appender = "0.2"
 
 # Async
 tokio = { version = "1", features = ["full"] }

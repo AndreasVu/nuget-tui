@@ -1,6 +1,7 @@
 use crossterm::event::EventStream;
 use futures::StreamExt;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tracing::info;
 
 use crate::nuget::client::{NugetClient, Package};
 use crate::projects::get_project_packages;
@@ -54,6 +55,7 @@ impl App {
     pub async fn run(&mut self, terminal: &mut ratatui::DefaultTerminal) -> anyhow::Result<()> {
         let mut events = EventStream::new();
 
+        info!("Initializing application");
         self.initialize_application().await;
 
         while !self.exit {
