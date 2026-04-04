@@ -29,14 +29,14 @@ pub enum PanelChangeDirection {
     Down,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Project {
     pub project_name: String,
     pub project_path: PathBuf,
     pub package_refs: Vec<PackageRef>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct PackageRef {
     pub package_id: String,
     pub version: String,

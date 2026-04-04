@@ -2,11 +2,11 @@ use std::env;
 use std::path::PathBuf;
 
 use futures::future;
-use tracing::info;
+use tracing::{error, info};
 use walkdir::WalkDir;
 
 use crate::{
-    app::App,
+    app::{App, AppEvent},
     nuget::client::Package,
     types::{PackageRef, Project},
 };
@@ -17,29 +17,42 @@ pub enum ProjectFile {
 }
 
 impl App {
-    pub async fn get_packages_from_projects(&self) -> Vec<Package> {
-        let tasks = self.projects.iter().map(|p| async move {
-            return self
-                .client
-                .get_packages(
-                    p.package_refs
-                        .iter()
-                        .map(|r| r.package_id.clone())
-                        .collect(),
-                )
-                .await;
+    pub fn get_packages_from_projects(&self) {
+        let tx = self.tx.clone();
+        let client = self.client.clone();
+        let projects = self.projects.clone();
+        tokio::spawn(async move {
+            let tasks = projects.iter().map(|p| async {
+                return client
+                    .get_packages(
+                        p.package_refs
+                            .iter()
+                            .map(|r| r.package_id.clone())
+                            .collect(),
+                    )
+                    .await;
+            });
+
+            let package_results = future::join_all(tasks).await;
+
+            let all_packages = package_results
+                .into_iter()
+                .filter_map(|p| match p {
+                    Ok(packages) => Some(packages),
+                    _ => None,
+                })
+                .flatten()
+                .collect();
+
+            match tx.send(AppEvent::SearchResult(all_packages)).await {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Failed to send search result: {}", e);
+                }
+            }
         });
 
-        let package_results = future::join_all(tasks).await;
-
-        package_results
-            .into_iter()
-            .filter_map(|p| match p {
-                Ok(packages) => Some(packages),
-                _ => None,
-            })
-            .flatten()
-            .collect()
+        return;
     }
 }
 

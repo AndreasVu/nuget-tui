@@ -72,7 +72,7 @@ impl App {
 
     async fn initialize_application(&mut self) {
         self.projects = get_project_packages();
-        self.packages = self.get_packages_from_projects().await;
+        self.get_packages_from_projects();
         // Fetch packages in current project.
         // fetch all packages installed
     }
