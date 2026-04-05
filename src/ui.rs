@@ -1,28 +1,30 @@
-use std::ops::Index;
-
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout, Offset, Rect, Rows},
-    style::{Color, Style, Stylize},
+    buffer::Buffer,
+    layout::{Constraint, Direction, Layout, Offset, Rect},
+    style::{Style, Stylize},
     symbols,
     text::{Line, ToSpan},
-    widgets::{Block, Borders, List, Padding, Paragraph, Row, Table, Tabs},
+    widgets::{Block, Borders, List, Padding, Paragraph, Row, Table, Tabs, Widget},
 };
 use throbber_widgets_tui::Throbber;
 use tracing::info;
 
-use crate::types::{PackageRef, Panel, SearchInputMode, Tab};
+use crate::types::{Panel, SearchInputMode, Tab};
 
 use crate::app::App;
 
 impl App {
-    pub fn draw(&self, frame: &mut Frame) {
+    pub fn draw(&mut self, frame: &mut Frame) {
+        // TODO: expand the project section and show list when active
+
+        // -- Layouts
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
-                Constraint::Percentage(7),
+                Constraint::Min(3),
                 Constraint::Fill(70),
-                Constraint::Percentage(10),
+                Constraint::Min(1),
             ])
             .split(frame.area());
 
@@ -43,54 +45,58 @@ impl App {
         let package_search_area = packages_area_layout[0];
         let package_list_area = packages_area_layout[1];
 
+        // -- Panels
+
         // Project panel
-        let mut proj_widget = List::new(self.projects.iter().map(|p| p.project_name.clone()))
-            .highlight_symbol("> ")
-            .block(Block::new().borders(Borders::ALL).title_top("Projects"));
-        if self.active_panel == Panel::Project {
-            proj_widget = proj_widget.rapid_blink();
-        }
-        frame.render_widget(proj_widget, project_area);
+        self.render_project_area(frame, project_area);
 
         // Search panel
+        self.render_search_box(frame, package_search_area);
+        self.render_help_message(frame, package_search_area + Offset::new(2, 0));
+
+        // Package list panel
+        self.render_package_content(frame, package_list_area);
+        self.render_package_tabs(frame, package_list_area + Offset::new(2, 0));
+        self.render_search_throbber(frame, package_list_area);
+
+        // Package details panel
+        self.render_package_description(frame, package_details_area);
+
+        // Hints panel
+        self.render_hints_panel(frame, hints_area);
+    }
+
+    fn render_search_box(&self, frame: &mut Frame<'_>, package_search_area: Rect) {
         let mut search_block = Block::new().borders(Borders::ALL);
         if self.active_panel == Panel::Search {
             search_block = search_block.border_style(Style::new().cyan());
         }
 
-        let mut search_field = Paragraph::new(self.search_input.value()).block(search_block);
-
-        if self.active_panel == Panel::Search {
-            search_field = search_field.rapid_blink();
-        }
+        let search_field =
+            Paragraph::new(self.search_state.search_input.value()).block(search_block);
         frame.render_widget(search_field, package_search_area);
-        self.render_help_message(frame, package_search_area + Offset::new(2, 0));
+    }
 
-        // Package list panel
-        self.render_package_content(frame, package_list_area);
-        self.render_package_tabs(frame, package_list_area + Offset::new(1, 0));
+    fn render_search_throbber(&self, frame: &mut Frame<'_>, package_list_area: Rect) {
+        if self.search_state.input_mode == SearchInputMode::Searching {
+            let throbber = Throbber::default().throbber_set(throbber_widgets_tui::BRAILLE_SIX);
+            frame.render_widget(throbber, package_list_area + Offset::new(1, 0));
+        }
+    }
 
-        // Package details panel
-        frame.render_widget(
-            Paragraph::new("package description here").block(Block::new().borders(Borders::ALL)),
-            package_details_area,
-        );
-
-        // Hints panel
-        frame.render_widget(
-            Block::default()
-                .borders(Borders::ALL)
-                .title_top("q - Quit")
-                .title_top("")
-                .title_top("j/k - Navigate within panel")
-                .title_top("")
-                .title_top("h/l - Navigate panel"),
-            hints_area,
-        );
+    fn render_project_area(&self, frame: &mut Frame<'_>, project_area: Rect) {
+        let mut project_widget_block = Block::new().borders(Borders::ALL).title_top("Projects");
+        if self.active_panel == Panel::Project {
+            project_widget_block = project_widget_block.border_style(Style::new().cyan());
+        }
+        let proj_widget = List::new(self.projects.iter().map(|p| p.project_name.clone()))
+            .highlight_symbol("> ")
+            .block(project_widget_block);
+        frame.render_widget(proj_widget, project_area);
     }
 
     fn render_help_message(&self, frame: &mut Frame, area: Rect) {
-        let help_message = Line::from_iter(match self.search_state {
+        let help_message = Line::from_iter(match self.search_state.input_mode {
             SearchInputMode::Normal | SearchInputMode::Searching => vec![
                 "Press ".to_span(),
                 "/".bold(),
@@ -111,23 +117,19 @@ impl App {
     pub fn render_package_tabs(&self, frame: &mut Frame, area: Rect) {
         let tabs = Tabs::new(vec!["Installed", "Search", "Upgrades"])
             .divider(symbols::DOT)
-            .padding(" ", " ")
             .select(self.active_tab as usize);
 
         frame.render_widget(tabs, area);
-
-        if self.search_state == SearchInputMode::Searching {
-            let throbber = Throbber::default().throbber_set(throbber_widgets_tui::BRAILLE_SIX);
-            frame.render_widget(throbber, area + Offset::new(40, 0));
-        }
     }
 
-    pub fn render_package_content(&self, frame: &mut Frame, area: Rect) {
+    pub fn render_package_content(&mut self, frame: &mut Frame, area: Rect) {
+        // TODO: Optimize this to not re-render the entire table on every update
+
         let rows = self
             .packages
             .iter()
             .map(|p| {
-                if let Some(index) = self.selected_package_index {
+                if let Some(index) = self.package_list_state.selected() {
                     if let Some(current_project) = self.projects.get(index)
                         && let Some(package_ref) = current_project
                             .package_refs
@@ -164,19 +166,19 @@ impl App {
         match self.active_tab {
             Tab::Installed => {
                 // TODO: Render installed packages
-                App::render_package_table(frame, area, rows);
+                self.render_package_table(frame, area, rows);
             }
             Tab::Upgrades => {
                 // TODO: Find packages that has updates available
             }
             Tab::Search => {
                 // TODO: Render the search results
-                App::render_package_table(frame, area, rows);
+                self.render_package_table(frame, area, rows);
             }
         }
     }
 
-    fn render_package_table(frame: &mut Frame, area: Rect, rows: Vec<TableRow>) {
+    fn render_package_table(&mut self, frame: &mut Frame, area: Rect, rows: Vec<TableRow>) {
         let headers =
             Row::new(["Name", "Installed Version", "Latest Version"]).style(Style::new().bold());
 
@@ -197,17 +199,83 @@ impl App {
             })
             .collect::<Vec<_>>();
 
+        let mut block = Block::new()
+            .borders(Borders::all())
+            .padding(Padding::new(1, 1, 0, 0));
+
+        if self.active_panel == Panel::Packages {
+            block = block.border_style(Style::new().cyan());
+        }
+
         let table = Table::new(rows, widths)
             .header(headers)
             .row_highlight_style(Style::new().on_magenta().green())
-            .highlight_symbol(">>")
-            .block(
-                Block::new()
-                    .borders(Borders::all())
-                    .padding(Padding::new(1, 1, 0, 0)),
-            );
+            .highlight_symbol("> ")
+            .block(block);
 
-        frame.render_widget(table, area);
+        frame.render_stateful_widget(table, area, &mut self.package_list_state);
+    }
+
+    fn render_hints_panel(&self, frame: &mut Frame<'_>, hints_area: Rect) {
+        let mut lines = vec![
+            " ".to_span(),
+            "Quit: ".to_span(),
+            "q ".bold(),
+            " | ".to_span(),
+            "Navigate panel: ".to_span(),
+            "j/k ".bold(),
+            " | ".to_span(),
+            "Change panel: ".to_span(),
+            "h/l".bold(),
+        ];
+
+        match self.active_panel {
+            Panel::Project => {
+                lines.append(
+                    vec![
+                        " | ".to_span(),
+                        "Select project: ".to_span(),
+                        "<space>".bold(),
+                    ]
+                    .as_mut(),
+                );
+            }
+            Panel::Packages => {
+                lines.append(
+                    vec![
+                        " | ".to_span(),
+                        "<space> ".bold(),
+                        "- Select package".to_span(),
+                        " | ".to_span(),
+                        "i ".bold(),
+                        "- Install package".to_span(),
+                    ]
+                    .as_mut(),
+                );
+            }
+            _ => {}
+        }
+
+        frame.render_widget(Line::from_iter(lines), hints_area);
+    }
+
+    fn render_package_description(&self, frame: &mut Frame<'_>, package_details_area: Rect) {
+        if let Some(selected_package_id) = self.package_list_state.selected() {
+            if let Some(_) = self.packages.get(selected_package_id) {
+                if let Some(readme) = &self.current_readme {
+                    info!("Trying to render markdown file: {}", readme);
+                    frame.render_widget(
+                        Paragraph::new(readme.clone()).block(Block::new().borders(Borders::ALL)),
+                        package_details_area,
+                    );
+                    return;
+                }
+            }
+        }
+        frame.render_widget(
+            Paragraph::new("package description here").block(Block::new().borders(Borders::ALL)),
+            package_details_area,
+        );
     }
 }
 

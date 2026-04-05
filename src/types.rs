@@ -43,9 +43,4 @@ pub struct PackageRef {
     pub version: String,
 }
 
-pub static PANEL_ORDER: &[Panel] = &[
-    Panel::Project,
-    Panel::Search,
-    Panel::Details,
-    Panel::Packages,
-];
+pub static PANEL_ORDER: &[Panel] = &[Panel::Project, Panel::Search, Panel::Packages];

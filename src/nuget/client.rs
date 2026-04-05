@@ -1,4 +1,5 @@
 use futures::future;
+use reqwest::StatusCode;
 
 #[derive(Debug, Default, Clone)]
 pub struct NugetClient {
@@ -43,6 +44,27 @@ impl NugetClient {
             })
             .flatten()
             .collect());
+    }
+
+    // Call this when package gets selected
+    pub async fn get_readme(
+        &self,
+        package_id: String,
+        version: String,
+    ) -> anyhow::Result<Option<String>> {
+        let url = format!(
+            "https://api.nuget.org/v3-flatcontainer/{}/{}/readme",
+            package_id.to_lowercase(),
+            version.to_lowercase()
+        );
+
+        let response = self.client.get(&url).send().await?;
+        if response.status() != StatusCode::OK {
+            return Ok(None);
+        }
+
+        let body = response.text().await?;
+        Ok(Some(body))
     }
 }
 

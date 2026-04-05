@@ -13,11 +13,26 @@ impl App {
             if ke.kind == KeyEventKind::Press {
                 match self.active_panel {
                     Panel::Search => self.handle_search_keys(event),
+                    Panel::Packages => self.handle_package_keys(ke),
                     _ => self.handle_navigation_keys(ke),
                 }
             }
         }
         Ok(())
+    }
+
+    fn handle_package_keys(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char('j') => {
+                self.selected_package_changed_handler();
+                self.package_list_state.select_next();
+            },
+            KeyCode::Char('k') => {
+                self.selected_package_changed_handler();
+                self.package_list_state.select_previous();
+            },
+            _ => self.handle_navigation_keys(key_event),
+        }
     }
 
     fn handle_navigation_keys(&mut self, key_event: KeyEvent) {
@@ -35,11 +50,11 @@ impl App {
         }
 
         let key_event = event.as_key_press_event().unwrap();
-        if self.search_state == SearchInputMode::Normal {
+        if self.search_state.input_mode == SearchInputMode::Normal {
             match key_event.code {
                 KeyCode::Char('/') => {
-                    if self.search_state == SearchInputMode::Normal {
-                        self.search_state = SearchInputMode::Editing;
+                    if self.search_state.input_mode == SearchInputMode::Normal {
+                        self.search_state.input_mode = SearchInputMode::Editing;
                     }
                 }
                 _ => self.handle_navigation_keys(key_event),
@@ -50,21 +65,24 @@ impl App {
 
         match key_event.code {
             KeyCode::Esc => {
-                self.search_state = SearchInputMode::Normal;
-            }
-            KeyCode::Char(_) => {
-                self.search_input.handle_event(&event);
+                self.search_state.input_mode = SearchInputMode::Normal;
             }
             KeyCode::Enter => {
                 let tx = self.tx.clone();
-                let search_value = self.search_input.value().to_string();
+                let search_value = self.search_state.search_input.value().to_string();
+
                 let client = self.client.clone();
 
+                // TODO: Handle scrolling and pagination for searching
                 tokio::spawn(async move { search_packages(&client, &tx, search_value).await });
 
-                self.search_state = SearchInputMode::Searching;
+                self.search_state.input_mode = SearchInputMode::Searching;
             }
-            _ => (),
+            _ => {
+                if self.search_state.input_mode == SearchInputMode::Editing {
+                    self.search_state.search_input.handle_event(&event);
+                }
+            }
         }
     }
 
