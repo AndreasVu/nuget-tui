@@ -49,8 +49,8 @@ impl NugetClient {
     // Call this when package gets selected
     pub async fn get_readme(
         &self,
-        package_id: String,
-        version: String,
+        package_id: &str,
+        version: &str,
     ) -> anyhow::Result<Option<String>> {
         let url = format!(
             "https://api.nuget.org/v3-flatcontainer/{}/{}/readme",

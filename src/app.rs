@@ -71,13 +71,12 @@ impl App {
 
         while !self.exit {
             self.search_state.search_throbber_state.calc_next();
-
-            terminal.draw(|frame| self.draw(frame))?;
-
             tokio::select! {
                 Some(Ok(event)) = events.next() => self.handle_event(event)?,
                 Some(app_event) = self.rx.recv() => self.handle_app_event(app_event)?,
             }
+
+            terminal.draw(|frame| self.draw(frame))?;
         }
 
         Ok(())
@@ -100,7 +99,7 @@ impl App {
                 let tx = self.tx.clone();
 
                 tokio::spawn(async move {
-                    let result = client.get_readme(pakcage_id, package_version).await;
+                    let result = client.get_readme(&pakcage_id, &package_version).await;
                     if let Err(e) = result {
                         eprintln!("Failed to get readme: {}", e);
                         return;
@@ -137,6 +136,7 @@ impl App {
             }
             _ => {}
         }
+
         Ok(())
     }
 }

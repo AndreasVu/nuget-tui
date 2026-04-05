@@ -207,11 +207,17 @@ impl App {
             block = block.border_style(Style::new().cyan());
         }
 
-        let table = Table::new(rows, widths)
+        let mut table = Table::new(rows, widths)
             .header(headers)
-            .row_highlight_style(Style::new().on_magenta().green())
+            .row_highlight_style(Style::new().bold().cyan())
             .highlight_symbol("> ")
             .block(block);
+
+        if self.active_panel != Panel::Packages {
+            table = table
+                .row_highlight_style(Style::new().dim())
+                .style(Style::new().dim())
+        }
 
         frame.render_stateful_widget(table, area, &mut self.package_list_state);
     }
@@ -259,6 +265,9 @@ impl App {
         frame.render_widget(Line::from_iter(lines), hints_area);
     }
 
+    // TODO: Split the are and show description with relevant info on top (Author, description, title, id)
+    // Show readme on bottom
+    // TODO: Fix readme not rendering on correct package
     fn render_package_description(&self, frame: &mut Frame<'_>, package_details_area: Rect) {
         if let Some(selected_package_id) = self.package_list_state.selected() {
             if let Some(_) = self.packages.get(selected_package_id) {
