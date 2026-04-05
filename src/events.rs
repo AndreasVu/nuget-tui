@@ -18,19 +18,20 @@ impl App {
                 }
             }
         }
+
         Ok(())
     }
 
     fn handle_package_keys(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('j') => {
-                self.selected_package_changed_handler();
                 self.package_list_state.select_next();
-            },
-            KeyCode::Char('k') => {
                 self.selected_package_changed_handler();
+            }
+            KeyCode::Char('k') => {
                 self.package_list_state.select_previous();
-            },
+                self.selected_package_changed_handler();
+            }
             _ => self.handle_navigation_keys(key_event),
         }
     }

@@ -70,13 +70,15 @@ impl App {
         self.initialize_application().await;
 
         while !self.exit {
-            self.search_state.search_throbber_state.calc_next();
+            terminal.draw(|frame| self.draw(frame))?;
+
             tokio::select! {
                 Some(Ok(event)) = events.next() => self.handle_event(event)?,
                 Some(app_event) = self.rx.recv() => self.handle_app_event(app_event)?,
+                _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => (),
             }
 
-            terminal.draw(|frame| self.draw(frame))?;
+            self.search_state.search_throbber_state.calc_next();
         }
 
         Ok(())
