@@ -267,23 +267,30 @@ impl App {
 
     // TODO: Split the are and show description with relevant info on top (Author, description, title, id)
     // Show readme on bottom
-    // TODO: Fix readme not rendering on correct package
     fn render_package_description(&self, frame: &mut Frame<'_>, package_details_area: Rect) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
+            .split(package_details_area);
+
+        let package_information_area = layout[0];
+        let readme_area = layout[1];
+
         if let Some(selected_package_id) = self.package_list_state.selected() {
             if let Some(_) = self.packages.get(selected_package_id) {
                 if let Some(readme) = &self.current_readme {
                     info!("Trying to render markdown file: {}", readme);
                     frame.render_widget(
                         Paragraph::new(readme.clone()).block(Block::new().borders(Borders::ALL)),
-                        package_details_area,
+                        readme_area,
                     );
                     return;
                 }
             }
         }
         frame.render_widget(
-            Paragraph::new("package description here").block(Block::new().borders(Borders::ALL)),
-            package_details_area,
+            Paragraph::new("Loading readme").block(Block::new().borders(Borders::ALL)),
+            readme_area,
         );
     }
 }
